@@ -1,14 +1,34 @@
 # Splunk Interactive Installer
 
-An opinionated, interactive shell installer for Splunk Enterprise on Linux, focused on **small test / lab environments** and **fast clean installs**.
+An interactive shell-based installer for **Splunk Enterprise** on Linux, focused on clean, repeatable installs and quick initial configuration for real deployments.
 
-This repository contains a single script:
+This repository currently contains a single main script:
 
 - `install_splunk_interactive.sh`
 
-The script walks you through installing Splunk Enterprise from an official `.tgz` URL, creating a dedicated system user, and (optionally) creating a few small custom indexes for your lab.
+The script guides you through installing Splunk Enterprise from an official `.tgz` URL, creating a dedicated system user, choosing deployment type, and optionally creating custom indexes.
 
-> هدف این اسکریپت این است که نصب اسپلانک روی سرورهای تست و لاب را خیلی سریع، تمیز و قابل تکرار کند.
+---
+
+## Overview
+
+```text
+┌────────────┐       ┌──────────────────────────────┐       ┌───────────────────┐
+│   Admin    │  ==>  │ install_splunk_interactive.sh│  ==>  │ Splunk Enterprise │
+└────────────┘       └──────────────────────────────┘       └───────────────────┘
+      │                         │                                   │
+      │                         │                                   │
+      ▼                         ▼                                   ▼
+ Choose version          Download & install                 Ready to use:
+, user, role, indexes    Configure and start               web UI, indexes, admin
+```
+
+This installer is designed to be:
+
+- **Structured** – always follows the same steps in the same order
+- **Safe** – uses a dedicated system user and `/opt/splunk` layout
+- **Flexible** – supports different Splunk versions and deployment roles
+- **Extensible** – you can easily extend it with your own automation
 
 ---
 
@@ -17,69 +37,74 @@ The script walks you through installing Splunk Enterprise from an official `.tgz
 - Interactive menu for **Splunk version family**:
   - 10.x
   - 9.x
-  - Custom (any `.tgz` URL)
-- Installs Splunk from official `.tgz` package under `/opt/splunk`
-- Creates a dedicated **system user** for Splunk (default: `splunk` or your choice)
-- Supports **single-instance** (search + index on same node) and basic multi-instance role choice
+  - Custom (any valid Splunk Enterprise `.tgz` URL)
+- Downloads and installs from official Splunk `.tgz` packages under `/opt/splunk`
+- Creates a dedicated **system user** for Splunk (default: `splunk` or a custom username)
+- Supports choosing deployment type:
+  - **Single-instance** (search head and indexer on the same node)
+  - **Multi-instance** role choice (basic role selection; full clustering configuration is intentionally left to Splunk administrators)
 - First-time **admin user** and password setup
 - Optional creation of **custom indexes**:
   - Ask how many indexes to create
   - Ask name of each index
-  - Ask max size in GB per index and converts to `maxTotalDataSizeMB`
+  - Ask max size in GB per index and converts it to `maxTotalDataSizeMB`
 - Configures Splunk to:
-  - Start at boot (SysV init script)
-  - Start Splunk for the first time
-- Prints the final **Web UI URL** at the end (for example `http://10.10.14.17:8000`)
+  - Start at boot using an init script
+  - Start Splunk for the first time with the chosen admin credentials
+- Prints a final summary including:
+  - Splunk home directory
+  - Splunk system user
+  - Deployment type
+  - Admin user
+  - Web UI URL (for example `http://10.10.14.17:8000`)
 
 ---
 
 ## Requirements
 
-Tested on:
+Tested with:
 
-- Ubuntu Server 22.04 LTS (64‑bit)
-- 2 GB RAM (minimum for a small lab)
-- A few GB free disk space under `/opt`
+- Linux: Ubuntu Server 22.04 LTS (64-bit)
+- CPU: x86_64
+- Memory: 2 GB or more
+- Disk: enough free space under `/opt` to hold the Splunk binaries and your initial indexes
 
 You should have:
 
-- Root access (or sudo)
-- Network access to `download.splunk.com` to fetch the Splunk `.tgz`
-- A valid Splunk download URL (for example a 10.x `.tgz` URL from the official Splunk downloads page)
+- Root access (or `sudo`)
+- Network access to `download.splunk.com` (or to your internal Splunk download mirror)
+- A valid Splunk Enterprise `.tgz` URL, for example:
+  - `https://download.splunk.com/products/splunk/releases/10.x.x/linux/splunk-10.x.x-<build>-linux-amd64.tgz`
 
 ---
 
-## What the script does (high level)
+## What the script does
 
-1. Checks that it is running as **root**.
-2. Asks for the Splunk **system user** name, creates it if needed (as a system user with home `/opt/splunk`).
-3. Lets you choose the **version family**:
+High-level flow:
+
+1. Verify that the script is running as **root**.
+2. Ask for the Splunk **system user** name:
+   - Create the user as a system user with home `/opt/splunk` if it does not exist.
+3. Let you choose the **version family**:
    - 10.x
    - 9.x
    - Custom
-4. Prompts for the **direct download URL** of the Splunk `.tgz` package.
-5. Downloads the package to `/opt/splunk.tgz`.
-6. Extracts Splunk under `/opt/splunk`.
-7. Asks for **deployment type**:
+4. Prompt for the **direct download URL** of the Splunk Enterprise `.tgz` package.
+5. Download the package to `/opt/splunk.tgz`.
+6. Extract Splunk into `/opt/splunk`.
+7. Ask for the **deployment type**:
    - Single-instance
-   - Multi-instance (for distributed setups; script only sets basic role, full clustering is out-of-scope)
-8. Prompts for:
-   - Splunk **admin username**
-   - Splunk **admin password** (with confirmation)
-9. Runs Splunk for the first time with the provided admin credentials.
+   - Multi-instance (role only; advanced topology and clustering are not configured by this script)
+8. Prompt for Splunk **admin username** and **password** (with confirmation).
+9. Run Splunk for the first time with the provided admin credentials and accept the license via CLI.
 10. Optionally:
-    - Asks whether you want to create **custom indexes**.
+    - Ask whether you want to create **custom indexes**.
     - For each index:
-      - Asks for index name.
-      - Asks for max size in GB.
-      - Calls `splunk add index` with `-maxTotalDataSizeMB` based on your input.
-11. Restarts Splunk to apply index configuration.
-12. Prints a summary:
-    - Splunk home directory
-    - Splunk system user
-    - Deployment type
-    - Admin user
-    - Web UI URL
+      - Ask for index name.
+      - Ask for max size in GB.
+      - Call `splunk add index` with `-maxTotalDataSizeMB` based on your input.
+11. Restart Splunk to apply index configuration.
+12. Display a final summary including the Web UI URL.
 
 ---
 
@@ -93,31 +118,32 @@ git clone https://github.com/mohamadyaghoobii/splunk-installer.git
 cd splunk-installer
 ```
 
-Or simply copy the script into a new directory:
+Or create the directory manually and copy the script:
 
 ```bash
 mkdir -p ~/splunk-installer
 cd ~/splunk-installer
-# Copy install_splunk_interactive.sh here
 chmod +x install_splunk_interactive.sh
 ```
 
-### 2. Run the installer as root
+### 2. Run the installer
+
+Run as root (or via sudo):
 
 ```bash
 sudo ./install_splunk_interactive.sh
 ```
 
-The script will ask you:
+You will be prompted for:
 
-1. Splunk system user name (default: `splunk`).
+1. Splunk system user name.
 2. Version family (10.x / 9.x / custom).
-3. Direct download URL of the Splunk `.tgz`.
-4. Deployment type (single-instance / multi-instance).
-5. Splunk admin username and password.
-6. Whether you want to create custom indexes (and if yes, their names and sizes).
+3. Direct download URL for the Splunk `.tgz`.
+4. Deployment type (single-instance or multi-instance).
+5. Admin username and password.
+6. Whether to create custom indexes and their details.
 
-At the end, you should see something like:
+At the end, you should see a summary similar to:
 
 ```text
 Installation complete.
@@ -128,73 +154,68 @@ Admin user: ojan-splunk
 Web UI should be available on: http://10.10.14.17:8000
 ```
 
-Open the Web UI in your browser and log in with the admin credentials you entered.
+Open the Web UI in your browser using the printed URL and log in with the admin credentials you entered.
 
 ---
 
-## Notes and Best Practices
+## Best practices
 
-- This script is designed for **lab / test environments**, not for large production clusters.
-- Always download Splunk from the official site and copy the **exact** `.tgz` URL.
-- For small test indexes, 1–5 GB per index is usually enough.
-- You can always manage indexes later from:
+- Always download Splunk from trusted and official sources.
+- Keep a record of the exact Splunk version you deployed (10.x build, etc.).
+- Limit initial index sizes to what makes sense for your disk layout; you can adjust them later in:
   - `$SPLUNK_HOME/etc/system/local/indexes.conf`
-  - Or via `Settings → Indexes` in the Splunk Web UI.
+  - Splunk Web UI: Settings → Indexes
+- Regularly back up:
+  - `$SPLUNK_HOME/etc` (configuration)
+  - Index data locations, depending on your retention and backup policies.
 
 ---
 
-## Updating Splunk
+## Extending the installer
 
-To upgrade Splunk using a newer `.tgz` manually:
+The script is intentionally written as a simple, readable shell installer so it can be extended. Some ideas for future enhancements:
 
-1. Stop Splunk:
+- Non-interactive mode:
+  - Support environment variables or flags for fully automated deployments.
+- Automatic detection of the latest Splunk Enterprise version in a family.
+- Optional post-install configuration:
+  - Inputs and data collection (syslog, Windows Event Logs, etc.).
+  - Basic apps or technology add-ons.
+- Health checks after installation:
+  - Verify ports and services.
+  - Check disk space and resource usage.
 
-   ```bash
-   sudo /opt/splunk/bin/splunk stop
-   ```
-
-2. Download the new `.tgz` under `/opt`.
-3. Extract it on top of the existing installation (or use your own controlled process).
-4. Start Splunk again:
-
-   ```bash
-   sudo /opt/splunk/bin/splunk start
-   ```
-
-**Important:** Always back up `$SPLUNK_HOME/etc` before major upgrades.
+You can fork this repository and adapt the installer to your own standards and production policies.
 
 ---
 
 ## Troubleshooting
 
-- **Port 8000 already in use**  
-  Make sure no other service is listening on port `8000` or change `web.conf` to use a different port.
+Common checks:
 
-- **Cannot reach Web UI**  
-  Check firewall rules and verify that the server IP and port are reachable:
+- Verify that Splunk is running:
+
+  ```bash
+  sudo /opt/splunk/bin/splunk status
+  ```
+
+- Restart Splunk:
+
+  ```bash
+  sudo /opt/splunk/bin/splunk restart
+  ```
+
+- Check local access to the Web UI:
+
   ```bash
   curl -vk http://127.0.0.1:8000
   ```
 
-- **Forgot admin password**  
-  You can use `user-seed.conf` or standard Splunk password reset procedures (see Splunk docs).
-
----
-
-## Roadmap / Ideas
-
-Possible future improvements for this installer:
-
-- Non-interactive mode (environment variables / flags) for automation.
-- Automatic download of the latest Splunk version (using the Splunk download API).
-- Optional configuration for:
-  - Receiving syslog
-  - Common test indexes (Windows, Linux, firewall, etc.)
-- Health checks after installation (ports, services, disk space).
+If you change ports or SSL settings, update your firewall and any reverse proxy configurations accordingly.
 
 ---
 
 ## License
 
-This project is provided as-is for lab and testing use.  
-Review and adapt the script before using it in sensitive or production environments.
+This installer is provided as-is.  
+Review the script and adapt it to your environment, standards, and security requirements before using it in production.
